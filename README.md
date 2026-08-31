@@ -2,7 +2,7 @@
 
 Unreal-style curve editor and runtime using Dear ImGui
 
-![](image.png)
+![](doc/image.png)
 
 ### Features and Controls
 
