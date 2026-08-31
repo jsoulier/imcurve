@@ -267,7 +267,10 @@ public:
                     }
                     else
                     {
-                        SelectedPoints = {hoveredReference};
+                        if (selectedPoint == SelectedPoints.end())
+                        {
+                            SelectedPoints = {hoveredReference};
+                        }
                         Edit = EditType_MovePoints;
                     }
                 }
