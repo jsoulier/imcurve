@@ -8,17 +8,14 @@ Unreal-style curve editor and runtime using Dear ImGui
 
 - Single and double precision curves
 - Square, linear, and quadratic interpolation
-- Separated editor and runtime (ImCurveEditor and ImCurve)
 - Double LMB to add a point
 - LCtrl+LMB to select a point
-- LMB+drag on the canvas to select points
-- LMB+drag on a point to move selected points
+- LMB+drag to select points or move points
 - Delete to remove selected points
 - RMB+drag to pan
 - Mouse wheel to zoom
 - RMB to change the interpolation type
-- Ctrl+Z to undo
-- Ctrl+R to redo
+- Ctrl+Z/R to undo and redo
 
 ### Example
 

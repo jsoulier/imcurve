@@ -132,6 +132,7 @@ public:
         , Viewport{}
         , EditStart{}
         , Edit{EditType_None}
+        , IsEditStarted{false}
         , IsEditorOpen{false}
     {
         assert(curve.Points.empty() || !curve.Points.back().HasControl());
@@ -239,10 +240,12 @@ public:
                 else
                 {
                     Edit = EditType_MoveCanvas;
+                    IsEditStarted = true;
                 }
             }
             if (isHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !hoveredReference)
             {
+                IsEditStarted = true;
                 ImCurvePoint<T> point;
                 point.Points[ImCurvePointType_Start] = Unproject(io.MousePos, canvasMin, plotSize);
                 curve.Points.insert(std::lower_bound(curve.Points.begin(), curve.Points.end(), point), point);
@@ -272,6 +275,7 @@ public:
                             SelectedPoints = {hoveredReference};
                         }
                         Edit = EditType_MovePoints;
+                        IsEditStarted = true;
                     }
                 }
                 else
@@ -281,6 +285,7 @@ public:
                         SelectedPoints.clear();
                     }
                     Edit = EditType_RectSelect;
+                    IsEditStarted = true;
                     EditStart = io.MousePos;
                 }
             }
@@ -357,6 +362,7 @@ public:
                     }
                     if (interpolationType != curve.Points[point].InterpolationType)
                     {
+                        IsEditStarted = true;
                         std::optional<ImCurvePoint<T>> end;
                         if (point + 1 < curve.Points.size())
                         {
@@ -372,6 +378,7 @@ public:
             {
                 if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !SelectedPoints.empty())
                 {
+                    IsEditStarted = true;
                     std::vector<int> points;
                     points.reserve(SelectedPoints.size());
                     for (const Reference& point : SelectedPoints)
@@ -439,9 +446,17 @@ public:
             }
             if (curve != GetCurve())
             {
-                History.Resize(HistoryIndex + 1);
-                History.Add(curve);
-                HistoryIndex = History.Size() - 1;
+                if (IsEditStarted)
+                {
+                    History.Resize(HistoryIndex + 1);
+                    History.Add(curve);
+                    HistoryIndex = History.Size() - 1;
+                    IsEditStarted = false;
+                }
+                else
+                {
+                    History[HistoryIndex] = curve;
+                }
             }
         }
         ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -561,6 +576,10 @@ public:
         {
             Edit = EditType_None;
         }
+        if (Edit == EditType_None)
+        {
+            IsEditStarted = false;
+        }
         ImGui::PopID();
     }
 
@@ -613,5 +632,6 @@ private:
     ImCurveRect<T> Viewport;
     ImVec2 EditStart;
     EditType Edit;
+    bool IsEditStarted;
     bool IsEditorOpen;
 };
