@@ -6,6 +6,7 @@
 #include <cmath>
 #include <compare>
 #include <concepts>
+#include <iomanip>
 #include <istream>
 #include <limits>
 #include <optional>
@@ -270,6 +271,8 @@ struct ImCurve
 template<std::floating_point T>
 std::ostream& operator<<(std::ostream& output, const ImCurve<T>& curve)
 {
+    std::streamsize precision = output.precision();
+    output << std::setprecision(std::numeric_limits<T>::max_digits10);
     output << curve.Points.size() << '\n';
     for (const ImCurvePoint<T>& point : curve.Points)
     {
@@ -285,6 +288,7 @@ std::ostream& operator<<(std::ostream& output, const ImCurve<T>& curve)
             << point.InterpolationType
             << '\n';
     }
+    output.precision(precision);
     return output;
 }
 
