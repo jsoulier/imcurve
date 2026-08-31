@@ -10,7 +10,7 @@ Unreal-style curve editor and runtime using Dear ImGui
 - Square, linear, and quadratic interpolation
 - Double LMB to add a point
 - LCtrl+LMB to select a point
-- LMB+drag to select points or move points
+- LMB+drag to select or move points
 - Delete to remove selected points
 - RMB+drag to pan
 - Mouse wheel to zoom
