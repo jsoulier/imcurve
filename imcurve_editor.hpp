@@ -177,8 +177,7 @@ public:
         if (editor)
         {
             ImGui::SetNextWindowSize(ImVec2{640.0f, 360.0f}, ImGuiCond_FirstUseEver);
-            std::string editorLabel = "Curve Editor##ImCurveEditor";
-            if (!ImGui::Begin(editorLabel.data(), &IsEditorOpen))
+            if (!ImGui::Begin(label, &IsEditorOpen))
             {
                 ImGui::End();
                 ImGui::PopID();
@@ -584,6 +583,20 @@ public:
     }
 
   private:
+    ImVec2 Project(const ImCurveVec2<T>& value, const ImVec2& canvasMin, const ImVec2& plotSize) const
+    {
+        T x = (value.X - Viewport.Min.X) / Viewport.GetWidth();
+        T y = (value.Y - Viewport.Min.Y) / Viewport.GetHeight();
+        return {canvasMin.x + kPadding + x * plotSize.x, canvasMin.y + kPadding + (1.0f - y) * plotSize.y};
+    }
+
+    ImCurveVec2<T> Unproject(const ImVec2& value, const ImVec2& canvasMin, const ImVec2& plotSize) const
+    {
+        T x = (value.x - canvasMin.x - kPadding) / plotSize.x;
+        T y = 1.0f - (value.y - canvasMin.y - kPadding) / plotSize.y;
+        return {Viewport.Min.X + x * Viewport.GetWidth(), Viewport.Min.Y + y * Viewport.GetHeight()};
+    }
+
     static T GetGridStep(T range)
     {
         T spacing = range / T{10};
@@ -611,21 +624,6 @@ public:
         }
     }
 
-    ImVec2 Project(const ImCurveVec2<T>& value, const ImVec2& canvasMin, const ImVec2& plotSize) const
-    {
-        T x = (value.X - Viewport.Min.X) / Viewport.GetWidth();
-        T y = (value.Y - Viewport.Min.Y) / Viewport.GetHeight();
-        return {canvasMin.x + kPadding + x * plotSize.x, canvasMin.y + kPadding + (1.0f - y) * plotSize.y};
-    }
-
-    ImCurveVec2<T> Unproject(const ImVec2& value, const ImVec2& canvasMin, const ImVec2& plotSize) const
-    {
-        T x = (value.x - canvasMin.x - kPadding) / plotSize.x;
-        T y = 1.0f - (value.y - canvasMin.y - kPadding) / plotSize.y;
-        return {Viewport.Min.X + x * Viewport.GetWidth(), Viewport.Min.Y + y * Viewport.GetHeight()};
-    }
-
-private:
     ImCurveCircularBuffer<ImCurve<T>, 64> History;
     size_t HistoryIndex;
     std::vector<Reference> SelectedPoints;
