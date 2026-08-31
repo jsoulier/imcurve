@@ -179,16 +179,6 @@ struct ImCurvePoint
         return T{};
     }
 
-    void Clamp(const ImCurvePoint<T>& end)
-    {
-        if (!HasControl())
-        {
-            return;
-        }
-        ImCurveVec2<T>& control = Points[ImCurvePointType_Control];
-        control.X = std::clamp(control.X, Points[ImCurvePointType_Start].X, end.Points[ImCurvePointType_Start].X);
-    }
-
     void SetInterpolationType(ImCurveInterpolationType interpolationType, std::optional<ImCurvePoint<T>> end = {})
     {
         InterpolationType = interpolationType;
@@ -196,7 +186,12 @@ struct ImCurvePoint
         {
             const ImCurveVec2<T>& start = Points[ImCurvePointType_Start];
             const ImCurveVec2<T>& finish = end->Points[ImCurvePointType_Start];
-            Points[ImCurvePointType_Control] = {(start.X + finish.X) / T{2}, (start.Y + finish.Y) / T{2}};
+            ImCurveVec2<T>& control = Points[ImCurvePointType_Control];
+            if (!HasControl())
+            {
+                control = {(start.X + finish.X) / T{2}, (start.Y + finish.Y) / T{2}};
+            }
+            control.X = std::clamp(control.X, start.X, finish.X);
         }
         else
         {

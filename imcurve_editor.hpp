@@ -426,11 +426,15 @@ public:
                 }
                 curve.Points = std::move(points);
                 SelectedPoints = std::move(selectedPoints);
-                for (size_t point = 0; point + 1 < curve.Points.size(); point++)
+                for (size_t point = 0; point < curve.Points.size(); point++)
                 {
-                    curve.Points[point].Clamp(curve.Points[point + 1]);
+                    std::optional<ImCurvePoint<T>> end;
+                    if (point + 1 < curve.Points.size())
+                    {
+                        end = curve.Points[point + 1];
+                    }
+                    curve.Points[point].SetInterpolationType(curve.Points[point].InterpolationType, end);
                 }
-                curve.Points.back().SetInterpolationType(curve.Points.back().InterpolationType);
                 assert(!curve.Points.back().HasControl());
             }
             if (curve != GetCurve())
