@@ -153,7 +153,6 @@ struct ImCurvePoint
             T t;
             if (std::abs(a) <= epsilon)
             {
-                assert(std::abs(b) > epsilon);
                 t = -c / b;
             }
             else
@@ -167,7 +166,7 @@ struct ImCurvePoint
                 if (t < T{} || t > T{1})
                 {
                     t = (-b + sqrt) / denominator;
-                    assert(t >= T{} && t <= T{1});
+                    t = std::clamp(t, T{}, T{1});
                 }
             }
             // y(t) = ((1-t)^2)y0 + 2(1-t)ty1 + (t^2)y2
@@ -268,10 +267,11 @@ std::ostream& operator<<(std::ostream& output, const ImCurve<T>& curve)
 {
     std::streamsize precision = output.precision();
     output << std::setprecision(std::numeric_limits<T>::max_digits10);
-    output << curve.Points.size() << '\n';
+    output << curve.Points.size();
     for (const ImCurvePoint<T>& point : curve.Points)
     {
         output
+            << ' '
             << point.Points[ImCurvePointType_Start].X
             << ' '
             << point.Points[ImCurvePointType_Start].Y
@@ -280,8 +280,7 @@ std::ostream& operator<<(std::ostream& output, const ImCurve<T>& curve)
             << ' '
             << point.Points[ImCurvePointType_Control].Y
             << ' '
-            << point.InterpolationType
-            << '\n';
+            << point.InterpolationType;
     }
     output.precision(precision);
     return output;
@@ -290,21 +289,36 @@ std::ostream& operator<<(std::ostream& output, const ImCurve<T>& curve)
 template<std::floating_point T>
 std::istream& operator>>(std::istream& input, ImCurve<T>& curve)
 {
-    size_t count;
-    input >> count;
-    curve.Points.resize(count);
-    for (size_t i = 0; i < curve.Points.size(); i++)
+    size_t count = 0;
+    if (!(input >> count))
     {
-        ImCurvePoint<T>& value = curve.Points[i];
-        int interpolationType;
-        input
-            >> value.Points[ImCurvePointType_Start].X
-            >> value.Points[ImCurvePointType_Start].Y
-            >> value.Points[ImCurvePointType_Control].X
-            >> value.Points[ImCurvePointType_Control].Y
-            >> interpolationType;
-        value.InterpolationType = ImCurveInterpolationType(interpolationType);
+        return input;
     }
-    assert(std::is_sorted(curve.Points.begin(), curve.Points.end()));
+    std::vector<ImCurvePoint<T>> points(count);
+    for (ImCurvePoint<T>& point : points)
+    {
+        int interpolationType = 0;
+        if (!(input
+            >> point.Points[ImCurvePointType_Start].X
+            >> point.Points[ImCurvePointType_Start].Y
+            >> point.Points[ImCurvePointType_Control].X
+            >> point.Points[ImCurvePointType_Control].Y
+            >> interpolationType))
+        {
+            return input;
+        }
+        if (interpolationType < ImCurveInterpolationType_Square || interpolationType > ImCurveInterpolationType_Quadratic)
+        {
+            input.setstate(std::ios::failbit);
+            return input;
+        }
+        point.InterpolationType = ImCurveInterpolationType(interpolationType);
+    }
+    if (!std::is_sorted(points.begin(), points.end()) || (!points.empty() && points.back().HasControl()))
+    {
+        input.setstate(std::ios::failbit);
+        return input;
+    }
+    curve.Points = std::move(points);
     return input;
 }

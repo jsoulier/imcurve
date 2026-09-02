@@ -8,6 +8,7 @@ Unreal-style curve editor and runtime using Dear ImGui
 
 - Single and double precision curves
 - Square, linear, and quadratic interpolation
+- Automatically saved in imgui.ini
 - Double LMB to add a point
 - LCtrl+LMB to select a point
 - LMB+drag to select or move points

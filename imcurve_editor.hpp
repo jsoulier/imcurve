@@ -1,8 +1,7 @@
 #pragma once
 
-#ifndef IMGUI_VERSION
-#error "Include imgui.h before imcurve_editor.hpp"
-#endif
+#include <imgui.h>
+#include <imgui_internal.h>
 
 #include <algorithm>
 #include <array>
@@ -14,13 +13,17 @@
 #include <functional>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <numeric>
 #include <ranges>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "imcurve.hpp"
+
+inline std::map<std::string, std::string> ImCurveEditorSettings;
 
 template<typename T, size_t N> requires (N > 0)
 class ImCurveCircularBuffer
@@ -134,29 +137,9 @@ public:
         , Edit{EditType_None}
         , IsEditStarted{false}
         , IsEditorOpen{false}
+        , IsLoaded{false}
     {
         assert(curve.Points.empty() || !curve.Points.back().HasControl());
-        if (!curve.Points.empty())
-        {
-            Viewport.Min = curve.Points.front().Points[ImCurvePointType_Start];
-            Viewport.Max = Viewport.Min;
-            for (const ImCurvePoint<T>& point : curve.Points)
-            {
-                Viewport.Expand(point.Points[ImCurvePointType_Start]);
-                if (point.HasControl())
-                {
-                    Viewport.Expand(point.Points[ImCurvePointType_Control]);
-                }
-            }
-        }
-        if (Viewport.GetWidth() == T{})
-        {
-            Viewport.Max.X += T{1};
-        }
-        if (Viewport.GetHeight() == T{})
-        {
-            Viewport.Max.Y += T{1};
-        }
         History.Add(std::move(curve));
     }
 
@@ -167,6 +150,82 @@ public:
 
     void Draw(const char* label, ImVec2 size = {-1.0f, -1.0f}, const std::vector<T>& highlightedPoints = {})
     {
+        if (!ImGui::FindSettingsHandler("ImCurve"))
+        {
+            ImGuiSettingsHandler handler;
+            handler.TypeName = "ImCurve";
+            handler.TypeHash = ImHashStr("ImCurve");
+            handler.ReadInitFn = [](ImGuiContext* context, ImGuiSettingsHandler* handler)
+            {
+                ImCurveEditorSettings.clear();
+            };
+            handler.ReadOpenFn = [](ImGuiContext* context, ImGuiSettingsHandler* handler, const char* name) -> void*
+            {
+                return &ImCurveEditorSettings[name];
+            };
+            handler.ReadLineFn = [](ImGuiContext* context, ImGuiSettingsHandler* handler, void* entry, const char* line)
+            {
+                if (*line)
+                {
+                    *static_cast<std::string*>(entry) = line;
+                }
+            };
+            handler.WriteAllFn = [](ImGuiContext* context, ImGuiSettingsHandler* handler, ImGuiTextBuffer* output)
+            {
+                for (const auto& [name, curve] : ImCurveEditorSettings)
+                {
+                    output->appendf("[%s][%s]\n", handler->TypeName, name.data());
+                    output->append(curve.data());
+                    output->append("\n\n");
+                }
+            };
+            ImGui::AddSettingsHandler(&handler);
+            ImGuiContext& context = *ImGui::GetCurrentContext();
+            if (context.SettingsLoaded && !context.SettingsIniData.empty())
+            {
+                std::string ini{context.SettingsIniData.begin(), context.SettingsIniData.end()};
+                ImGui::LoadIniSettingsFromMemory(ini.data(), ini.size());
+            }
+        }
+        if (!IsLoaded)
+        {
+            IsLoaded = true;
+            auto settings = ImCurveEditorSettings.find(label);
+            if (settings != ImCurveEditorSettings.end())
+            {
+                std::istringstream input{settings->second};
+                ImCurve<T> curve;
+                if (input >> curve)
+                {
+                    History.Clear();
+                    History.Add(std::move(curve));
+                    HistoryIndex = 0;
+                }
+            }
+            const ImCurve<T>& curve = GetCurve();
+            Viewport = {};
+            if (!curve.Points.empty())
+            {
+                Viewport.Min = curve.Points.front().Points[ImCurvePointType_Start];
+                Viewport.Max = Viewport.Min;
+                for (const ImCurvePoint<T>& point : curve.Points)
+                {
+                    Viewport.Expand(point.Points[ImCurvePointType_Start]);
+                    if (point.HasControl())
+                    {
+                        Viewport.Expand(point.Points[ImCurvePointType_Control]);
+                    }
+                }
+            }
+            if (Viewport.GetWidth() == T{})
+            {
+                Viewport.Max.X += T{1};
+            }
+            if (Viewport.GetHeight() == T{})
+            {
+                Viewport.Max.Y += T{1};
+            }
+        }
         if (size.x < 0.0f || size.y < 0.0f)
         {
             size = {ImGui::GetContentRegionAvail().x, 72.0f};
@@ -456,6 +515,10 @@ public:
                 {
                     History[HistoryIndex] = curve;
                 }
+                std::ostringstream output;
+                output << GetCurve();
+                ImCurveEditorSettings[label] = output.str();
+                ImGui::MarkIniSettingsDirty();
             }
         }
         ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -467,8 +530,8 @@ public:
         {
             ImU32 gridColor = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.15f);
             ImU32 textColor = ImGui::GetColorU32(ImGuiCol_Text);
-            T stepX = GetGridStep(Viewport.GetWidth());
-            T stepY = GetGridStep(Viewport.GetHeight());
+            T stepX = GetSpacing(Viewport.GetWidth());
+            T stepY = GetSpacing(Viewport.GetHeight());
             T stepX1 = std::ceil(Viewport.Min.X / stepX) * stepX;
             T stepY1 = std::ceil(Viewport.Min.Y / stepY) * stepY;
             for (T x = stepX1; x <= Viewport.Max.X; x += stepX)
@@ -582,22 +645,8 @@ public:
         ImGui::PopID();
     }
 
-  private:
-    ImVec2 Project(const ImCurveVec2<T>& value, const ImVec2& canvasMin, const ImVec2& plotSize) const
-    {
-        T x = (value.X - Viewport.Min.X) / Viewport.GetWidth();
-        T y = (value.Y - Viewport.Min.Y) / Viewport.GetHeight();
-        return {canvasMin.x + kPadding + x * plotSize.x, canvasMin.y + kPadding + (1.0f - y) * plotSize.y};
-    }
-
-    ImCurveVec2<T> Unproject(const ImVec2& value, const ImVec2& canvasMin, const ImVec2& plotSize) const
-    {
-        T x = (value.x - canvasMin.x - kPadding) / plotSize.x;
-        T y = 1.0f - (value.y - canvasMin.y - kPadding) / plotSize.y;
-        return {Viewport.Min.X + x * Viewport.GetWidth(), Viewport.Min.Y + y * Viewport.GetHeight()};
-    }
-
-    static T GetGridStep(T range)
+private:
+    T GetSpacing(T range)
     {
         T spacing = range / T{10};
         if (spacing <= T{})
@@ -624,6 +673,20 @@ public:
         }
     }
 
+    ImVec2 Project(const ImCurveVec2<T>& value, const ImVec2& canvasMin, const ImVec2& plotSize) const
+    {
+        T x = (value.X - Viewport.Min.X) / Viewport.GetWidth();
+        T y = (value.Y - Viewport.Min.Y) / Viewport.GetHeight();
+        return {canvasMin.x + kPadding + x * plotSize.x, canvasMin.y + kPadding + (1.0f - y) * plotSize.y};
+    }
+
+    ImCurveVec2<T> Unproject(const ImVec2& value, const ImVec2& canvasMin, const ImVec2& plotSize) const
+    {
+        T x = (value.x - canvasMin.x - kPadding) / plotSize.x;
+        T y = 1.0f - (value.y - canvasMin.y - kPadding) / plotSize.y;
+        return {Viewport.Min.X + x * Viewport.GetWidth(), Viewport.Min.Y + y * Viewport.GetHeight()};
+    }
+
     ImCurveCircularBuffer<ImCurve<T>, 64> History;
     size_t HistoryIndex;
     std::vector<Reference> SelectedPoints;
@@ -632,4 +695,5 @@ public:
     EditType Edit;
     bool IsEditStarted;
     bool IsEditorOpen;
+    bool IsLoaded;
 };
