@@ -3,7 +3,7 @@ project(imcurve)
 
 add_library(imcurve INTERFACE)
 add_library(imcurve::imcurve ALIAS imcurve)
-set_target_properties(imcurve PROPERTIES CXX_STANDARD 23)
+set_target_properties(imcurve PROPERTIES CXX_STANDARD 20)
 target_include_directories(imcurve INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(PROJECT_IS_TOP_LEVEL)
@@ -26,6 +26,6 @@ if(PROJECT_IS_TOP_LEVEL)
         lib/imgui/imgui_widgets.cpp
     )
     target_include_directories(imcurve_example PRIVATE lib/imgui lib/imgui/backends)
-    set_target_properties(imcurve_example PROPERTIES CXX_STANDARD 23)
+    set_target_properties(imcurve_example PROPERTIES CXX_STANDARD 20)
     target_link_libraries(imcurve_example PRIVATE SDL3::SDL3 imcurve)
 endif()

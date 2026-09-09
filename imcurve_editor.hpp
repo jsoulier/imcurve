@@ -131,7 +131,7 @@ public:
     ImCurveEditor(ImCurve<T> curve = {})
         : History{}
         , HistoryIndex{0}
-        , SelectedPoints{}
+        , References{}
         , Viewport{}
         , EditStart{}
         , Edit{EditType_None}
@@ -292,7 +292,7 @@ public:
             {
                 if (hoveredReference)
                 {
-                    SelectedPoints = {hoveredReference};
+                    References = {hoveredReference};
                     ImGui::OpenPopup("Point");
                 }
                 else
@@ -307,30 +307,30 @@ public:
                 ImCurvePoint<T> point;
                 point.Points[ImCurvePointType_Start] = Unproject(io.MousePos, canvasMin, plotSize);
                 curve.Points.insert(std::lower_bound(curve.Points.begin(), curve.Points.end(), point), point);
-                SelectedPoints.clear();
+                References.clear();
                 Edit = EditType_None;
             }
             else if (isHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             {
                 if (hoveredReference)
                 {
-                    auto selectedPoint = std::find(SelectedPoints.begin(), SelectedPoints.end(), hoveredReference);
+                    auto selectedPoint = std::find(References.begin(), References.end(), hoveredReference);
                     if (io.KeyCtrl)
                     {
-                        if (selectedPoint == SelectedPoints.end())
+                        if (selectedPoint == References.end())
                         {
-                            SelectedPoints.push_back(hoveredReference);
+                            References.push_back(hoveredReference);
                         }
                         else
                         {
-                            SelectedPoints.erase(selectedPoint);
+                            References.erase(selectedPoint);
                         }
                     }
                     else
                     {
-                        if (selectedPoint == SelectedPoints.end())
+                        if (selectedPoint == References.end())
                         {
-                            SelectedPoints = {hoveredReference};
+                            References = {hoveredReference};
                         }
                         Edit = EditType_MovePoints;
                         IsEditStarted = true;
@@ -340,7 +340,7 @@ public:
                 {
                     if (!io.KeyCtrl)
                     {
-                        SelectedPoints.clear();
+                        References.clear();
                     }
                     Edit = EditType_RectSelect;
                     IsEditStarted = true;
@@ -357,7 +357,7 @@ public:
                     Edit = EditType_None;
                     break;
                 }
-                for (const Reference& point : SelectedPoints)
+                for (const Reference& point : References)
                 {
                     ImCurveVec2<T>& value = curve.Points[point.Index].Points[point.Type];
                     value.X += mouseDelta.X;
@@ -367,7 +367,7 @@ public:
             }
             case EditType_RectSelect:
             {
-                SelectedPoints.clear();
+                References.clear();
                 float x = io.MousePos.x - EditStart.x;
                 float y = io.MousePos.y - EditStart.y;
                 if (x * x + y * y >= 16.0f)
@@ -382,7 +382,7 @@ public:
                             ImVec2 position = Project(curve.Points[point].Points[type], canvasMin, plotSize);
                             if (selection.Contains({position.x, position.y}))
                             {
-                                SelectedPoints.push_back({point, type});
+                                References.push_back({point, type});
                             }
                         }
                     }
@@ -410,9 +410,9 @@ public:
             }
             if (ImGui::BeginPopup("Point"))
             {
-                if (!SelectedPoints.empty())
+                if (!References.empty())
                 {
-                    int point = SelectedPoints.front().Index;
+                    int point = References.front().Index;
                     int interpolationType = curve.Points[point].InterpolationType;
                     for (int type = 0; type < std::size(kImCurveInterpolationType); type++)
                     {
@@ -434,18 +434,18 @@ public:
             }
             if (isHovered || isActive)
             {
-                if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !SelectedPoints.empty())
+                if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !References.empty())
                 {
                     IsEditStarted = true;
                     std::vector<int> points;
-                    points.reserve(SelectedPoints.size());
-                    for (const Reference& point : SelectedPoints)
+                    points.reserve(References.size());
+                    for (const Reference& point : References)
                     {
                         points.push_back(point.Index);
                     }
                     std::sort(points.begin(), points.end(), std::greater<int>{});
                     points.erase(std::unique(points.begin(), points.end()), points.end());
-                    SelectedPoints.clear();
+                    References.clear();
                     for (int point : points)
                     {
                         assert(point < curve.Points.size());
@@ -456,13 +456,13 @@ public:
                 {
                     HistoryIndex--;
                     curve = GetCurve();
-                    SelectedPoints.clear();
+                    References.clear();
                 }
                 if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R) && HistoryIndex + 1 < History.Size())
                 {
                     HistoryIndex++;
                     curve = GetCurve();
-                    SelectedPoints.clear();
+                    References.clear();
                 }
             }
             if (!curve.Points.empty())
@@ -476,10 +476,10 @@ public:
                 std::vector<ImCurvePoint<T>> points;
                 std::vector<Reference> selectedPoints;
                 points.reserve(curve.Points.size());
-                selectedPoints.reserve(SelectedPoints.size());
+                selectedPoints.reserve(References.size());
                 for (size_t point : order)
                 {
-                    for (Reference selectedPoint : SelectedPoints)
+                    for (Reference selectedPoint : References)
                     {
                         if (selectedPoint.Index == point)
                         {
@@ -490,7 +490,7 @@ public:
                     points.push_back(std::move(curve.Points[point]));
                 }
                 curve.Points = std::move(points);
-                SelectedPoints = std::move(selectedPoints);
+                References = std::move(selectedPoints);
                 for (size_t point = 0; point < curve.Points.size(); point++)
                 {
                     std::optional<ImCurvePoint<T>> end;
@@ -607,7 +607,7 @@ public:
                 ImVec2 end = Project(GetCurve().Points[point + 1].Points[ImCurvePointType_Start], canvasMin, plotSize);
                 Reference reference{point, ImCurvePointType_Control};
                 float radius = kUnselectedRadius;
-                if (std::ranges::contains(SelectedPoints, reference) || hoveredReference == reference)
+                if (std::ranges::find(References, reference) != References.end() || hoveredReference == reference)
                 {
                     radius = kSelectedRadius;
                 }
@@ -618,7 +618,7 @@ public:
             ImVec2 position = Project(GetCurve().Points[point].Points[ImCurvePointType_Start], canvasMin, plotSize);
             Reference reference{point, ImCurvePointType_Start};
             float radius = kUnselectedRadius;
-            if (std::ranges::contains(SelectedPoints, reference) || hoveredReference == reference)
+            if (std::ranges::find(References, reference) != References.end() || hoveredReference == reference)
             {
                 radius = kSelectedRadius;
             }
@@ -694,7 +694,7 @@ private:
 
     ImCurveCircularBuffer<ImCurve<T>, 64> History;
     size_t HistoryIndex;
-    std::vector<Reference> SelectedPoints;
+    std::vector<Reference> References;
     ImCurveRect<T> Viewport;
     ImVec2 EditStart;
     EditType Edit;
