@@ -564,30 +564,35 @@ public:
         static constexpr float kPixelsPerSample = 32.0f;
         int sampleCount = std::max(int(std::ceil(plotSize.x / kPixelsPerSample)), 1);
         std::vector<ImVec2> samples;
-        samples.reserve(GetCurve().Points.size() * (sampleCount + 1));
-        if (GetCurve().Points.size() > 1)
-        {
-            samples.push_back(Project(GetCurve().Points.front().Points[ImCurvePointType_Start], canvasMin, plotSize));
-        }
+        samples.reserve(sampleCount + 2);
         for (size_t startPoint = 0; startPoint + 1 < GetCurve().Points.size(); startPoint++)
         {
-            T startX = GetCurve().Points[startPoint].Points[ImCurvePointType_Start].X;
-            T endX = GetCurve().Points[startPoint + 1].Points[ImCurvePointType_Start].X;
-            for (int sample = 1; sample <= sampleCount; sample++)
+            const ImCurvePoint<T>& start = GetCurve().Points[startPoint];
+            const ImCurvePoint<T>& end = GetCurve().Points[startPoint + 1];
+            T startX = start.Points[ImCurvePointType_Start].X;
+            T endX = end.Points[ImCurvePointType_Start].X;
+            T width = endX - startX;
+            samples.clear();
+            samples.push_back(Project(start.Points[ImCurvePointType_Start], canvasMin, plotSize));
+            if (width > std::numeric_limits<T>::epsilon())
             {
-                T alpha = T(sample) / T(sampleCount);
-                T x = startX + (endX - startX) * alpha;
-                samples.push_back(Project({x, GetCurve().Sample(x, startPoint)}, canvasMin, plotSize));
+                for (int sample = 1; sample < sampleCount; sample++)
+                {
+                    T alpha = T(sample) / T(sampleCount);
+                    T x = startX + width * alpha;
+                    samples.push_back(Project({x, GetCurve().Sample(x, startPoint)}, canvasMin, plotSize));
+                }
+                if (start.InterpolationType == ImCurveInterpolationType_Square && start.Points[ImCurvePointType_Start].Y != end.Points[ImCurvePointType_Start].Y)
+                {
+                    samples.push_back(Project({endX, start.Points[ImCurvePointType_Start].Y}, canvasMin, plotSize));
+                }
             }
-            samples.push_back(Project(GetCurve().Points[startPoint + 1].Points[ImCurvePointType_Start], canvasMin, plotSize));
+            samples.push_back(Project(end.Points[ImCurvePointType_Start], canvasMin, plotSize));
+            drawList->AddPolyline(samples.data(), samples.size(), sampleColor, ImDrawFlags_None, 2.0f);
         }
         static constexpr float kUnselectedRadius = 3.0f;
         static constexpr float kSelectedRadius = 6.0f;
         static constexpr float kHighlightedRadius = 6.0f;
-        if (samples.size() >= 2)
-        {
-            drawList->AddPolyline(samples.data(), samples.size(), sampleColor, ImDrawFlags_None, 2.0f);
-        }
         for (T point : highlightedPoints)
         {
             drawList->AddCircleFilled(Project({point, GetCurve().Sample(point)}, canvasMin, plotSize), kHighlightedRadius, sampleColor);
