@@ -21,7 +21,6 @@ Unreal-style curve editor and runtime using Dear ImGui
 ### Example
 
 ```c++
-#include <imgui.h>
 #include <imcurve_editor.hpp>
 
 class Character
@@ -47,4 +46,13 @@ private:
     ImCurveEditor<float> Velocity;
     float Position;
 };
+```
+
+### CMake
+
+You can clone and add the following to your `CMakeLists.txt`:
+
+```cmake
+add_subdirectory(<path>)
+target_link_libraries(<name> PRIVATE imcurve::imcurve)
 ```
